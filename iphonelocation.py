@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/opt/local/bin/python2.7
 ############################################################################################################
 ## LIBRARY IMPORT                                                                                          #
 ############################################################################################################
@@ -69,14 +69,14 @@ try:
 	application_logging_name = 'iPhoneLocation'
 	pid = os.getpid()
 	print "Startup: PID={}".format(pid)
-	if opsys == 'linux':
+	if opsys == 'linux' or opsys == 'darwin':
 		f_out = open('/tmp/{}.pid'.format(application_logging_name), 'w', 0)
 	elif opsys == 'windows':
 		f_out = open('c:\{}.pid'.format(application_logging_name), 'w', 0)		
 	f_out.write(str(pid))
 	f_out.flush
 	f_out.close
-	if opsys == 'linux':
+	if opsys == 'linux' or opsys == 'darwin':
 		print "Startup: Created pidfile at /tmp/{}.pid".format(application_logging_name)
 	elif opsys == 'windows':
 		print "Startup: Created pidfile at c:\{}.pid".format(application_logging_name)
@@ -269,6 +269,7 @@ try:
 			try:
 				global db_conf
 				db_conf = {}
+				db_conf['enabled'] = parser.getboolean('database', 'enabled')
 				db_conf['name'] = parser.get('database', 'database')
 				db_conf['host'] = parser.get('database', 'host')
 				db_conf['port'] = int(parser.get('database', 'port'))
@@ -290,11 +291,17 @@ try:
 				### Grab the ISY connection settings:
 				global isy_conf
 				isy_conf = {}
+				isy_conf['enabled'] = parser.getboolean('ISY', 'enabled')
 				isy_conf['username'] = parser.get('ISY', 'username')
 				isy_conf['password'] = parser.get('ISY', 'password')
 				isy_conf['hostname'] = parser.get('ISY', 'hostname')
 				isy_conf['port'] = int(parser.get('ISY', 'port'))
 				isy_conf['SSL'] = parser.getboolean('ISY', 'SSL')
+				isy_conf['WifiVAR'] = parser.get('ISY', 'WifiVAR')
+				isy_conf['WifiVAR_Expected'] = int(parser.get('ISY', 'WifiVAR_Expected'))
+				isy_conf['BtVAR'] = parser.get('ISY', 'BtVAR')
+				isy_conf['BtVAR_Expected'] = int(parser.get('ISY', 'BtVAR_Expected'))
+				isy_conf['DistanceVAR'] = parser.get('ISY', 'DistanceVAR') 
 				logger.debug('MAIN - isy_conf: {}'.format(isy_conf))
 			except:
 				logger.error('MAIN - Error reading settings from iphonelocation.ini in your [ISY] section. You may need to start wiith a new .ini \
@@ -365,11 +372,6 @@ try:
 				device_conf['shortname'] = parser.get('device', 'shortname')
 				device_conf['WiFiCheck'] = parser.getboolean('device', 'WiFiCheck')
 				device_conf['BTCheck'] = parser.getboolean('device', 'BTCheck')
-				device_conf['ISYWifiVAR'] = parser.get('device', 'ISYWifiVAR')
-				device_conf['ISYWifiVAR_Expected'] = int(parser.get('device', 'ISYWifiVAR_Expected'))
-				device_conf['ISYBtVAR'] = parser.get('device', 'ISYBtVAR')
-				device_conf['ISYBtVAR_Expected'] = int(parser.get('device', 'ISYBtVAR_Expected'))
-				device_conf['ISYDistanceVAR'] = parser.get('device', 'ISYDistanceVAR')
 				device_conf['iCloudGUID'] = parser.get('device', 'iCloudGUID')
 				device_conf['location_home_lat'] = parser.get('device', 'location_home_lat')
 				device_conf['location_home_long'] = parser.get('device', 'location_home_long')
@@ -455,6 +457,7 @@ try:
 			if section_database == True:
 				try:
 					db_conf = {}
+					db_conf['enabled'] = parser.getboolean('database', 'enabled')
 					db_conf['name'] = parser.get('database', 'database')
 					db_conf['host'] = parser.get('database', 'host')
 					db_conf['port'] = int(parser.get('database', 'port'))
@@ -475,6 +478,7 @@ try:
 				try:
 					### Grab the ISY connection settings:
 					isy_conf = {}
+					isy_conf['enabled'] = parser.getboolean('ISY', 'enabled')
 					isy_conf['username'] = parser.get('ISY', 'username')
 					isy_conf['password'] = parser.get('ISY', 'password')
 					isy_conf['hostname'] = parser.get('ISY', 'hostname')
@@ -538,11 +542,6 @@ try:
 					device_conf['shortname'] = parser.get('device', 'shortname')
 					device_conf['WiFiCheck'] = parser.getboolean('device', 'WiFiCheck')
 					device_conf['BTCheck'] = parser.getboolean('device', 'BTCheck')
-					device_conf['ISYWifiVAR'] = parser.get('device', 'ISYWifiVAR')
-					device_conf['ISYWifiVAR_Expected'] = int(parser.get('device', 'ISYWifiVAR_Expected'))
-					device_conf['ISYBtVAR'] = parser.get('device', 'ISYBtVAR')
-					device_conf['ISYBtVAR_Expected'] = int(parser.get('device', 'ISYBtVAR_Expected'))
-					device_conf['ISYDistanceVAR'] = parser.get('device', 'ISYDistanceVAR')
 					device_conf['iCloudGUID'] = parser.get('device', 'iCloudGUID')
 					device_conf['location_home_lat'] = parser.get('device', 'location_home_lat')
 					device_conf['location_home_long'] = parser.get('device', 'location_home_long')
@@ -605,11 +604,12 @@ except:
 	exit(1)
 
 ### Connect to MySQL database for logging:
-try:
-	db = pw.MySQLDatabase(db_conf['name'], host=db_conf['host'], port=db_conf['port'], user=db_conf['user'], passwd=db_conf['passwd'])
-except:
-	logger.error('MAIN - Error connecting to your MySQL database. Please check your database configuration and/or MySQL server.', exc_info=True)
-	exit()
+if db_conf['enabled'] == True:
+	try:
+		db = pw.MySQLDatabase(db_conf['name'], host=db_conf['host'], port=db_conf['port'], user=db_conf['user'], passwd=db_conf['passwd'])
+	except:
+		logger.error('MAIN - Error connecting to your MySQL database. Please check your database configuration and/or MySQL server.', exc_info=True)
+		exit()
 #
 ############################################################################################################
 ## ENVIRONMENT SETUP                                                                                       #
@@ -632,83 +632,85 @@ global app_version_is_current
 app_version_is_current = None
 global app_version_update_url
 app_version_update_url = None
+
 ### Create database with proper logging fields:
-class MySQLModel(pw.Model):
-    """A base model that will use our MySQL database"""
-    class Meta:
-        database = db
+if db_conf['enabled'] == True:
+	class MySQLModel(pw.Model):
+		"""A base model that will use our MySQL database"""
+		class Meta:
+			database = db
 
-class location_log(MySQLModel):
-	iCloud_timeStamp = pw.DateTimeField()
-	App_timeStamp = pw.DateTimeField()
-	App_data_age = pw.DoubleField()
-	App_distance_home = pw.DoubleField()
-	iCloud_latitude = pw.DoubleField()
-	iCloud_longitude = pw.DoubleField()
-	iCloud_horizontalAccuracy = pw.DoubleField()
-	iCloud_positionType = pw.CharField()
-	iCloud_locationType = pw.CharField()
-	iCloud_locationFinished = pw.BooleanField()
-	iCloud_isOld = pw.BooleanField()
-	iCloud_isInaccurate = pw.BooleanField()
-	iCloud_batterylevel = pw.DoubleField()
-	App_ISYUpdated = pw.BooleanField()
-	App_ISYUpdateValue = pw.DoubleField()
-	App_SleepTime = pw.DoubleField()
-	App_FailedAttempts = pw.DoubleField()
-	App_LoopNumber = pw.DoubleField()
+	class location_log(MySQLModel):
+		iCloud_timeStamp = pw.DateTimeField()
+		App_timeStamp = pw.DateTimeField()
+		App_data_age = pw.DoubleField()
+		App_distance_home = pw.DoubleField()
+		iCloud_latitude = pw.DoubleField()
+		iCloud_longitude = pw.DoubleField()
+		iCloud_horizontalAccuracy = pw.DoubleField()
+		iCloud_positionType = pw.CharField()
+		iCloud_locationType = pw.CharField()
+		iCloud_locationFinished = pw.BooleanField()
+		iCloud_isOld = pw.BooleanField()
+		iCloud_isInaccurate = pw.BooleanField()
+		iCloud_batterylevel = pw.DoubleField()
+		App_ISYUpdated = pw.BooleanField()
+		App_ISYUpdateValue = pw.DoubleField()
+		App_SleepTime = pw.DoubleField()
+		App_FailedAttempts = pw.DoubleField()
+		App_LoopNumber = pw.DoubleField()
 	
-db.connect()
-db.create_tables([location_log], True)
-db.close()
-
-try:
-	logger.debug('MAIN - Looking at DB schema')
 	db.connect()
-
-	### Check to see how many record are in this DB:
-	num_of_records = location_log.select().count()
-	logger.info('MAIN - There are {} records in the current DB'.format(num_of_records))
+	db.create_tables([location_log], True)
+	db.close()
 	
-	if num_of_records == 0:
-		logger.info('MAIN - Your DB is empty, dropping and recreating the tables to make sure they are up to date.')
-		logger.debug('MAIN - Dropping location_log.')
-		db.drop_tables([location_log], True)
-		logger.debug('MAIN - Creating location_log.')
-		db.create_tables([location_log], True)	
-	else:
-		try:
-			### Try to get a single location log record:
-			location_log_data = location_log.get()
-			### Print a list of the field names:
-			logger.debug('MAIN - The current location_log table has the following fields: {}'.format(location_log_data._data))
-			location_log_data = dict(location_log_data._data)
-			logger.debug('MAIN - The current location_log dict fields: {}'.format(location_log_data))
-			### Print the dict keys:
-			logger.debug('MAIN - The current location_log table has the following keys: {}'.format(location_log_data.keys()))
-			### Check for battery_level in the DB:
-			if 'iCloud_batterylevel' in location_log_data.keys():
-				logger.debug('MAIN - iCloud_batterylevel is present in your database')
-			else:
-				logger.debug('MAIN - iCloud_batterylevel is NOT preset, adding it to your database')
-		except:
-			logger.warn('MAIN - Getting a record failed, this probably means you do not have the iCloud_batterylevel field in your DB, adding it.', exc_info=True)
-			### If getting the record fails, add the battery level field to the DB:
-			try:
-				logger.debug('MAIN - Definging the migrator')
-				migrator = MySQLMigrator(db)
-				logger.debug('MAIN - Adding the columnn.')
-				#iCloud_batterylevel = pw.DoubleField()
-				migrate(
-					migrator.add_column('location_log', 'iCloud_batterylevel', pw.DoubleField(default=-1))
-				)
-			except:
-				logger.warn('MAIN - Failed to add the iCloud_batterylevel column', exc_info=True)
+	try:
+		logger.debug('MAIN - Looking at DB schema')
+		db.connect()
+	
+		### Check to see how many record are in this DB:
+		num_of_records = location_log.select().count()
+		logger.info('MAIN - There are {} records in the current DB'.format(num_of_records))
 		
-	db.close()
-except:
-	logger.error('MAIN - Looking at DB schema failed!', exc_info=True)
-	db.close()
+		if num_of_records == 0:
+			logger.info('MAIN - Your DB is empty, dropping and recreating the tables to make sure they are up to date.')
+			logger.debug('MAIN - Dropping location_log.')
+			db.drop_tables([location_log], True)
+			logger.debug('MAIN - Creating location_log.')
+			db.create_tables([location_log], True)	
+		else:
+			try:
+				### Try to get a single location log record:
+				location_log_data = location_log.get()
+				### Print a list of the field names:
+				logger.debug('MAIN - The current location_log table has the following fields: {}'.format(location_log_data._data))
+				location_log_data = dict(location_log_data._data)
+				logger.debug('MAIN - The current location_log dict fields: {}'.format(location_log_data))
+				### Print the dict keys:
+				logger.debug('MAIN - The current location_log table has the following keys: {}'.format(location_log_data.keys()))
+				### Check for battery_level in the DB:
+				if 'iCloud_batterylevel' in location_log_data.keys():
+					logger.debug('MAIN - iCloud_batterylevel is present in your database')
+				else:
+					logger.debug('MAIN - iCloud_batterylevel is NOT preset, adding it to your database')
+			except:
+				logger.warn('MAIN - Getting a record failed, this probably means you do not have the iCloud_batterylevel field in your DB, adding it.', exc_info=True)
+				### If getting the record fails, add the battery level field to the DB:
+				try:
+					logger.debug('MAIN - Definging the migrator')
+					migrator = MySQLMigrator(db)
+					logger.debug('MAIN - Adding the columnn.')
+					#iCloud_batterylevel = pw.DoubleField()
+					migrate(
+						migrator.add_column('location_log', 'iCloud_batterylevel', pw.DoubleField(default=-1))
+					)
+				except:
+					logger.warn('MAIN - Failed to add the iCloud_batterylevel column', exc_info=True)
+		
+		db.close()
+	except:
+		logger.error('MAIN - Looking at DB schema failed!', exc_info=True)
+		db.close()
 #
 #
 #
@@ -872,13 +874,13 @@ def api_login():
 		### Authenticate to the iCloud API and populate the 'api' variable:
 		logger.debug('API_LOGIN - Authenticating to the iCloud API.')
 		api = PyiCloudService(icloudapi_conf['username'], icloudapi_conf['password'])
-
+		
 		### Check to see if they API requested 2 factor authentication:
 		if api.requires_2fa:
 			twofa_auth()
 		else:
 			pass
-	
+		
 		api_last_used_time = datetime.datetime.now()
 		logger.debug('API_LOGIN - Sleep for 3 seconds to let login process.')
 		time.sleep(3)
@@ -926,7 +928,7 @@ def radio_check():
 		if device_conf['WiFiCheck'] == True:
 			### Read the value of the wifi present variable:
 			logger.debug('RADIO_CHECK - Checking to see if the iPhone is present on WiFi...')
-			exit_code, iPhone_WiFi_Here = individual_radio_check(device_conf['ISYWifiVAR'], device_conf['ISYWifiVAR_Expected'])
+			exit_code, iPhone_WiFi_Here = individual_radio_check(isy_conf['WifiVAR'], isy_conf['WifiVAR_Expected'])
 			if exit_code == 0:
 				logger.debug("RADIO_CHECK - iPhone_WiFi_Here: {}".format(iPhone_WiFi_Here))
 			else:
@@ -940,7 +942,7 @@ def radio_check():
 		if device_conf['BTCheck'] == True:
 			### Read the value of the wifi present variable:
 			logger.debug('RADIO_CHECK - Checking to see if the iPhone is present on Bluetooth...')
-			exit_code, iPhone_BT_Here = individual_radio_check(device_conf['ISYBtVAR'], device_conf['ISYBtVAR_Expected'])
+			exit_code, iPhone_BT_Here = individual_radio_check(isy_conf['BtVAR'], isy_conf['BtVAR_Expected'])
 			if exit_code == 0:
 				logger.debug("RADIO_CHECK - iPhone_BT_Here: {}".format(iPhone_BT_Here))
 			else:
@@ -1009,7 +1011,7 @@ def device_data_read():
 		isold_attempt = 1
 		### Set the attempt number to read data if it's old:
 		isfromcell_attempt = 1
-
+		
 		
 		
 		while True:
@@ -1129,7 +1131,7 @@ def twofa_auth():
 		if not api.send_verification_code(device):
 			print "Failed to send verification code"
 			sys.exit(1)
-	
+		
 		code = click.prompt('Please enter validation code')
 		if not api.validate_verification_code(device, code):
 			print "Failed to verify verification code"
@@ -1156,12 +1158,13 @@ def device_battery_level():
 			### Validate the data:
 			if Device_Battery_Level >= 1 and Device_Battery_Level <= 100:
 				logger.debug('DEVICE_BATTERY_LEVEL - Got a valid battery level of: {}%, returning.'.format(Device_Battery_Level))
-				if general_conf['battery_isy_reporting'] == True:
-					logger.debug('DEVICE_BATTERY_LEVEL - Battery level reporting to the ISY is enabled.')
-					isy_variable('set', 'state', general_conf['battery_isy_variable'], Device_Battery_Level)
-				else:
-					logger.debug('DEVICE_BATTERY_LEVEL - Battery level reporting to the ISY is not enabled')
-				return 0, Device_Battery_Level
+				if isy_conf['enabled'] == True:
+					if general_conf['battery_isy_reporting'] == True:
+						logger.debug('DEVICE_BATTERY_LEVEL - Battery level reporting to the ISY is enabled.')
+						isy_variable('set', 'state', general_conf['battery_isy_variable'], Device_Battery_Level)
+					else:
+						logger.debug('DEVICE_BATTERY_LEVEL - Battery level reporting to the ISY is not enabled')
+					return 0, Device_Battery_Level
 				### The line below was added to be uncommented for testing battery threshold
 				#return 0, 15
 			else:
@@ -1289,7 +1292,7 @@ while True:
 	if loop_sleep_interval >= loop_sleep_time:
 		### Record what loop number the application is running
 		logger.debug('MAIN - Loop Number: {}'.format(loop_number))
-	
+		
 		### Calculate the last time the GPS location was read.
 		time_since_last_loop_run = ((datetime.datetime.now() - last_loop_run)).total_seconds()
 		logger.debug('MAIN - The last iOS device GPS check was {} seconds ago.'.format(time_since_last_loop_run))
@@ -1307,8 +1310,8 @@ while True:
 		if loop_sleep_interval >= loop_sleep_time:
 			logger.debug('MAIN - GPS recheck is not enabled, running the radio check')
 			iPhone_RadioInRange = radio_check()
-
-
+	
+	
 	### Run the rest of the loop only if the iPhone is out of radio range:
 	if not iPhone_RadioInRange:
 		logger.debug("MAIN - iPhone is not in radio range or WiFi and BT checking is disabled, checking GPS...")
@@ -1403,16 +1406,17 @@ while True:
 				else:
 					logger.debug("MAIN - The distance from home has changed. It was {}, now it's {}, updating the ISY.".format(distance_home_previous, distance_home_precision))
 					### Set the following ISY variable
-					#isy_PX_Steve_Distance_From_Home.value = int(distance_home)
-					exit_code, isy_status = isy_variable('set', 'state', device_conf['ISYDistanceVAR'], distance_home_precision)
-					if exit_code != 0 or isy_status != 200:
-						logger.warn("MAIN - Updating the ISY failed, will try again next loop.")
-						isy_updated = False
-					else:
-						### Set the previous variable
-						isy_updated = True
-						logger.debug("MAIN - Recording the distance_home_previous variable.")
-						distance_home_previous = distance_home_precision
+					if isy_conf['enabled'] == True:
+						#isy_PX_Steve_Distance_From_Home.value = int(distance_home)
+						exit_code, isy_status = isy_variable('set', 'state', isy_conf['DistanceVAR'], distance_home_precision)
+						if exit_code != 0 or isy_status != 200:
+							logger.warn("MAIN - Updating the ISY failed, will try again next loop.")
+							isy_updated = False
+						else:
+							### Set the previous variable
+							isy_updated = True
+							logger.debug("MAIN - Recording the distance_home_previous variable.")
+							distance_home_previous = distance_home_precision
 					
 				### Set the ISY value display to reflect if an update was made
 				if isy_updated:
@@ -1476,34 +1480,35 @@ while True:
 					logger.debug("MAIN - Computing the sleep time returned an error. Setting it to 300 seconds.")
 					sleep_time = 300
 	
-				try:
-				### Create dict to store data in database:
-					db_entry = {
-						'iCloud_timeStamp': iPhone_Location_Time,
-						'App_timeStamp': api_last_used_time,
-						'App_data_age': data_age,
-						'App_distance_home': distance_home,
-						'iCloud_latitude': iPhone_Location['latitude'],
-						'iCloud_longitude': iPhone_Location['longitude'],
-						'iCloud_horizontalAccuracy': iPhone_Location['horizontalAccuracy'],
-						'iCloud_positionType': iPhone_Location['positionType'],
-						'iCloud_locationType': str(iPhone_Location['locationType']),
-						'iCloud_locationFinished': iPhone_Location['locationFinished'],
-						'iCloud_isOld': iPhone_Location['isOld'],
-						'iCloud_isInaccurate': iPhone_Location['isInaccurate'],
-						'iCloud_batterylevel': battery_level,
-						'App_ISYUpdated': isy_updated,
-						'App_ISYUpdateValue': distance_home_precision,
-						'App_SleepTime': int(sleep_time),
-						'App_FailedAttempts': failed_attempts,
-						'App_LoopNumber': loop_number
-						}
-					db.connect()
-					location_log.create(**db_entry)
-					db.close()
-				except:
-					logger.warn('MAIN - DB entry failed.', exc_info = True)
-	
+				if db_conf['enabled'] == True:
+					try:
+					### Create dict to store data in database:
+						db_entry = {
+							'iCloud_timeStamp': iPhone_Location_Time,
+							'App_timeStamp': api_last_used_time,
+							'App_data_age': data_age,
+							'App_distance_home': distance_home,
+							'iCloud_latitude': iPhone_Location['latitude'],
+							'iCloud_longitude': iPhone_Location['longitude'],
+							'iCloud_horizontalAccuracy': iPhone_Location['horizontalAccuracy'],
+							'iCloud_positionType': iPhone_Location['positionType'],
+							'iCloud_locationType': str(iPhone_Location['locationType']),
+							'iCloud_locationFinished': iPhone_Location['locationFinished'],
+							'iCloud_isOld': iPhone_Location['isOld'],
+							'iCloud_isInaccurate': iPhone_Location['isInaccurate'],
+							'iCloud_batterylevel': battery_level,
+							'App_ISYUpdated': isy_updated,
+							'App_ISYUpdateValue': distance_home_precision,
+							'App_SleepTime': int(sleep_time),
+							'App_FailedAttempts': failed_attempts,
+							'App_LoopNumber': loop_number
+							}
+						db.connect()
+						location_log.create(**db_entry)
+						db.close()
+					except:
+						logger.warn('MAIN - DB entry failed.', exc_info = True)
+				
 				### Reset the number of failed attempts after one works:
 				failed_attempts = 0
 				
@@ -1555,8 +1560,8 @@ while True:
 	#last_loop_run = time.time()
 	###### END OF THE WHILE LOOP ######
 
-if opsys == 'linux':
-	logger.info('MAIN - Removing pidfile: /var/run/{}.pid'.format(application_logging_name))
+if opsys == 'linux' or opsys == 'darwin':
+	logger.info('MAIN - Removing pidfile: /tmp/{}.pid'.format(application_logging_name))
 	os.remove('/tmp/{}.pid'.format(application_logging_name))
 elif opsys == 'windows':
 	logger.info('MAIN - Removing pidfile: c:\{}.pid'.format(application_logging_name))
